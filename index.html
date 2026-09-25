@@ -11,8 +11,8 @@
 html,body{height:100%;width:100%;overflow:hidden;background:#000033}
 #stage-wrap{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000033;overflow:hidden}
 #stage{
-  width:1440px;
-  height:900px;
+  width:1920px;
+  height:1080px;
   transform-origin:center center;
   position:relative;
   font-family:'Press Start 2P',monospace;
@@ -828,7 +828,7 @@ body.readable #tour-replay{background:#131c30;border:1px solid #374151;color:#a7
 <div id="stage-wrap"><div id="stage">
 <script>
 (function(){
-  var STAGE_W = 1440, STAGE_H = 900;
+  var STAGE_W = 1920, STAGE_H = 1080;
   function fitStage(){
     var stage = document.getElementById('stage');
     if(!stage) return;
