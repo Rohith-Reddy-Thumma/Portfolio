@@ -1,62 +1,50 @@
-// api/chat.js  —  Vercel serverless function (Node runtime)
-// Keeps the Groq API key server-side and relays the portfolio's Veritas chat to Groq.
-// Set an environment variable named GROQ_API_KEY in your Vercel project settings.
+// Vercel serverless function: /api/chat
+// Matches the contract your index.html already uses:
+//   request body:  { system, messages }
+//   response body: { reply }
+// Keeps the OpenAI API key server-side. The browser never sees it.
+// Requires an OPENAI_API_KEY environment variable set in the Vercel project settings.
 
-module.exports = async (req, res) => {
+export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    res.status(405).json({ reply: '', error: 'Method not allowed' });
+    res.status(405).json({ error: 'Method not allowed' });
     return;
   }
 
-  const key = process.env.GROQ_API_KEY;
-  if (!key) {
-    res.status(200).json({
-      reply: "The chat isn't configured yet — the site owner needs to add a GROQ_API_KEY environment variable in Vercel."
-    });
+  const { system, messages } = req.body || {};
+
+  if (!Array.isArray(messages)) {
+    res.status(400).json({ error: 'messages must be an array' });
     return;
   }
 
   try {
-    const { system, messages } = req.body || {};
-
-    // Rebuild a clean, safe message list for Groq (OpenAI-compatible format).
-    const msgs = [];
-    if (system) msgs.push({ role: 'system', content: String(system) });
-    if (Array.isArray(messages)) {
-      for (const m of messages) {
-        if (m && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string') {
-          msgs.push({ role: m.role, content: m.content });
-        }
-      }
-    }
-
-    const groq = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    const openaiRes = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${key}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${process.env.OPENAI_API_KEY}`,
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile',
-        messages: msgs,
+        model: 'gpt-4o-mini',
         max_tokens: 400,
-        temperature: 0.5
-      })
+        messages: [
+          { role: 'system', content: system || '' },
+          ...messages,
+        ],
+      }),
     });
 
-    const data = await groq.json();
+    const data = await openaiRes.json();
 
-    if (!groq.ok) {
-      res.status(200).json({
-        reply: 'Hmm, I hit a snag connecting. Please try again!',
-        error: (data && data.error && data.error.message) || 'groq_error'
-      });
+    if (!openaiRes.ok) {
+      res.status(openaiRes.status).json({ error: data.error?.message || 'OpenAI request failed' });
       return;
     }
 
-    const reply = (data.choices && data.choices[0] && data.choices[0].message && data.choices[0].message.content) || '';
+    const reply = data.choices?.[0]?.message?.content || '';
     res.status(200).json({ reply });
-  } catch (e) {
-    res.status(200).json({ reply: 'Hmm, I hit a snag connecting. Please try again!', error: 'exception' });
+  } catch (err) {
+    res.status(500).json({ error: 'Upstream request failed' });
   }
-};
+}
